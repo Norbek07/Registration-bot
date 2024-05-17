@@ -1,28 +1,31 @@
+from aiogram import Bot, Dispatcher
+from aiogram.enums import ParseMode
+from aiogram.filters import CommandStart,Command
+from aiogram import F
+from aiogram.types import Message,InlineKeyboardButton
+from data import config
 import asyncio
 import logging
 import sys
-from aiogram import Bot, Dispatcher, F
-from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart,Command
-from aiogram.fsm.state import StatesGroup,State
-from aiogram.fsm.context import FSMContext
-from aiogram.types import Message,ReplyKeyboardRemove
-from filters.admin import IsAdminFilter
-from filters.check_sub_channel import IsCheckSubChannels,CHANNELS
-from bot_state import Register, reg_button
-from bot_sqlite import create_users,add_user,count_users, add_user_full,get_all_user_ids
-from keyboardbutton import main_button,computer_button,computers,computers_info, phones_info, phone_button, phones
+from menucommands.set_bot_commands  import set_default_commands
+from baza.sqlite import Database
+from filters.admin import IsBotAdminFilter
+from keyboard_buttons import admin_keyboard
+from aiogram.fsm.context import FSMContext #new
+from states.reklama import Adverts
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from states.bot_state import Register, reg_button
+from baza.bot_sqlite import create_users,add_user,count_users, add_user_full,get_all_user_ids
+from keyboard_buttons.keyboardbutton import main_button,computer_button,computers,computers_info, phones_info, phone_button, phones
+import time 
 
-TOKEN = "6858596228:AAF4nh6HiqoqGuU9r_InsILgN19hhPveTv8"
-ADMINS = [5012784380]
+ADMINS = config.ADMINS
+TOKEN = config.BOT_TOKEN
+CHANNELS = config.CHANNELS
 
 dp = Dispatcher()
 
-#  Reklama uchun Class yaratildi
-class Advert(StatesGroup):
-    advert = State()
 
-#  Start bosganda Foydalanuvchilarni ID sini qo'shish
 @dp.message(CommandStart())
 async def command_start_handler(message: Message):
     telegram_id = message.from_user.id
@@ -43,7 +46,7 @@ async def command_start_handler(message: Message):
 
 @dp.message(F.text=="📝 Ro'yxatdan o'tish")
 async def register(message:Message, state:FSMContext):
-    await message.answer(text= "Ismingizni kiriting !",reply_markup=ReplyKeyboardRemove())
+    await message.answer(text= "Ismingizni kiriting !",reply_markup=reg_button)
     await state.set_state(Register.first_name)
 
 # Ro'yxatdan o'tish uchun (reg)
@@ -128,28 +131,12 @@ async def register_email(message:Message, state:FSMContext):
         text = f"Salom {full_name}, Nima xizmat"
     await message.answer(text,reply_markup =main_button)
 
+@dp.message(Register.region)
+async def register_region_del(message:Message, state:FSMContext):
+    await message.answer(text= "☎️ Telefon raqamni kiriting")
+    await message.delete()
 
-
-@dp.message(Register.phone_number)
-async def register_phone_number_del(message:Message):
-    await message.answer(text= "Telefon raqamni to'g'ri kiriting!")
-    await message.delete() 
-
-@dp.message(Command("count"), IsAdminFilter(ADMINS))
-async def foyda_soni(message:Message):
-    try:
-        foydalanuvchilar_soni = count_users()[0]
-        await message.answer(f"Botimizda {foydalanuvchilar_soni}ta foydalanuvchi mavjud")
-    except:
-        await message.answer(f"Botimizda foydalanuvchi yo'q")
-
-@dp.message(Command("advert"),IsAdminFilter(ADMINS))
-async def advert_admin(message:Message,state:FSMContext):
-    await message.answer("Reklama yuboringiz mumkin...")
-    await state.set_state(Advert.advert)
-import time
-
-@dp.message(Advert.advert)
+@dp.message(Adverts.advert)
 async def send_advert(message:Message,state:FSMContext):
     message_id = message.message_id
     from_user = message.from_user.id
@@ -221,23 +208,115 @@ async def computer_func(message:Message):
     text = "Asosiy menu"
     await message.answer(text=text, reply_markup=main_button)
 
-# Bot ishga tushishi haqida ma'lumot
+
+@dp.message(CommandStart())
+async def start_command(message:Message):
+    full_name = message.from_user.full_name
+    telegram_id = message.from_user.id
+    try:
+        db.add_user(full_name=full_name,telegram_id=telegram_id) #foydalanuvchi bazaga qo'shildi
+        await message.answer(text="Assalomu alaykum, botimizga hush kelibsiz")
+    except:
+        await message.answer(text="Assalomu alaykum")
+
+
+
+
+# @dp.message(IsCheckSubChannels())
+# async def kanalga_obuna(message:Message):
+#     text = ""
+#     inline_channel = InlineKeyboardBuilder()
+#     for index,channel in enumerate(CHANNELS):
+#         ChatInviteLink = await bot.create_chat_invite_link(channel)
+#         inline_channel.add(InlineKeyboardButton(text=f"{index+1}-kanal",url=ChatInviteLink.invite_link))
+#     inline_channel.adjust(1,repeat=True)
+#     button = inline_channel.as_markup()
+#     await message.answer(f"{text} kanallarga azo bo'ling",reply_markup=button)
+
+
+
+#help commands
+@dp.message(Command("help"))
+async def help_commands(message:Message):
+    await message.answer("Sizga qanday yordam kerak")
+    
+#about commands
+@dp.message(Command("about"))
+async def about_commands(message:Message):
+    await message.answer("Sifat 2024")
+
+
+@dp.message(Command("admin"),IsBotAdminFilter(ADMINS))
+async def is_admin(message:Message):
+    await message.answer(text="Admin menu",reply_markup=admin_keyboard.admin_button)
+
+
+@dp.message(F.text=="Foydalanuvchilar soni",IsBotAdminFilter(ADMINS))
+async def users_count(message:Message):
+    counts = db.count_users()
+    text = f"Botimizda {counts[0]} ta foydalanuvchi bor"
+    await message.answer(text=text)
+
+@dp.message(F.text=="Reklama yuborish",IsBotAdminFilter(ADMINS))
+async def advert_dp(message:Message,state:FSMContext):
+    await state.set_state(Adverts.adverts)
+    await message.answer(text="Reklama yuborishingiz mumkin !")
+
+@dp.message(Adverts.adverts)
+async def send_advert(message:Message,state:FSMContext):
+    
+    message_id = message.message_id
+    from_chat_id = message.from_user.id
+    users = db.all_users_id()
+    count = 0
+    for user in users:
+        try:
+            await bot.copy_message(chat_id=user[0],from_chat_id=from_chat_id,message_id=message_id)
+            count += 1
+        except:
+            pass
+        time.sleep(0.01)
+    
+    await message.answer(f"Reklama {count}ta foydalanuvchiga yuborildi")
+    await state.clear()
+
+
 @dp.startup()
-async def bot_start():
-    await bot.send_message(ADMINS[0], "Botimiz ishga tushdi !")
+async def on_startup_notify(bot: Bot):
+    for admin in ADMINS:
+        try:
+            await bot.send_message(chat_id=int(admin),text="Bot ishga tushdi")
+        except Exception as err:
+            logging.exception(err)
 
+#bot ishga tushganini xabarini yuborish
 @dp.shutdown()
-async def bot_start():
-    await bot.send_message(ADMINS[0], "Bot to'xtadi !")    
+async def off_startup_notify(bot: Bot):
+    for admin in ADMINS:
+        try:
+            await bot.send_message(chat_id=int(admin),text="Bot ishdan to'xtadi!")
+        except Exception as err:
+            logging.exception(err)
 
 
-async def main():
-    create_users()
-    global bot
-    bot = Bot(TOKEN, parse_mode=ParseMode.HTML) 
+def setup_middlewares(dispatcher: Dispatcher, bot: Bot) -> None:
+    """MIDDLEWARE"""
+    from middlewares.throttling import ThrottlingMiddleware
+
+    # Spamdan himoya qilish uchun klassik ichki o'rta dastur. So'rovlar orasidagi asosiy vaqtlar 0,5 soniya
+    dispatcher.message.middleware(ThrottlingMiddleware(slow_mode_delay=0.5))
+
+
+
+async def main() -> None:
+    global bot,db
+    bot = Bot(TOKEN, parse_mode=ParseMode.HTML)
+    db = Database(path_to_db="main.db")
+    await set_default_commands(bot)
     await dp.start_polling(bot)
-
+    setup_middlewares(dispatcher=dp, bot=bot)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+
     asyncio.run(main())
