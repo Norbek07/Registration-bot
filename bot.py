@@ -16,7 +16,6 @@ from states.reklama import Adverts
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from states.bot_state import Register, reg_button
 from baza.bot_sqlite import create_users,add_user,count_users, add_user_full,get_all_user_ids
-from keyboard_buttons.keyboardbutton import main_button,computer_button,computers,computers_info, phones_info, phone_button, phones
 import time 
 
 ADMINS = config.ADMINS
@@ -31,7 +30,7 @@ async def command_start_handler(message: Message):
     telegram_id = message.from_user.id
     full_name = message.from_user.full_name
 
-    welcome_text = f"Salom {full_name},  \nKompyuter va telefonlar botiga hush kelibsiz 😊 \nBotdan foydalanish uchun ro'yxatdan o'ting❗️"
+    welcome_text = f"Salom {full_name}, Botdan foydalanish uchun ro'yxatdan o'ting❗️"
     default_text = f"Salom {full_name}, Nima xizmat"
     send_text = message.text
 
@@ -116,125 +115,12 @@ async def register_email(message:Message, state:FSMContext):
     age = data.get("age")
     region = data.get("region")
     phone_number = message.text
-    text = f"⚠️Yangi o'quvchi ro'yxatdan o'tdi ❗️ : \nIsmi: {first_name} \nFamiliyasi: {last_name} \nYoshi: {age} \nManzil: {region} \nTelefon raqam: {phone_number}"
+    text = f"😊 Tabriklaymiz siz ro'yxatdan o'tdinggiz: ✅ \nIsmi: {first_name} \nFamiliyasi: {last_name} \nYoshi: {age} \nManzil: {region} \nTelefon raqam: {phone_number}"
 
     await bot.send_message(chat_id=ADMINS[0], text=text)
 
     await state.clear()
-    # data ga ma'lumotini yangilash user id ga qarab
-    telegram_id = message.from_user.id
-    full_name = message.from_user.full_name
-    try:
-        add_user_full(first_name, last_name, age, region, phone_number,telegram_id)
-        text = "Siz muvaffaqiyatli ro'yhatdan o'tdingiz 🎉"
-    except:
-        text = f"Salom {full_name}, Nima xizmat"
-    await message.answer(text,reply_markup =main_button)
-
-@dp.message(Register.region)
-async def register_region_del(message:Message, state:FSMContext):
-    await message.answer(text= "☎️ Telefon raqamni kiriting")
-    await message.delete()
-
-@dp.message(Adverts.advert)
-async def send_advert(message:Message,state:FSMContext):
-    message_id = message.message_id
-    from_user = message.from_user.id
-    ids = get_all_user_ids()
-
-    for id in ids:
-        try:
-            await bot.copy_message(chat_id=id[0],from_chat_id=from_user,message_id=message_id)
-            time.sleep(0.1)
-        except:
-            pass
-    await state.clear()
-
-@dp.message(F.text=="💁🏻‍♂️ About us")
-async def about_as_handler(message:Message):
-    about = "Biz sizga arzon va sifatli texnikalar xarid qilishingizda yordam beramiz ! \n➕ Barcha maxsulotlarimiz 100% kafolatlangan ✅ \n➕ Tovarlarni O'zbekiston bo'ylab yetkazib berish bepul ✅ "
-    photo_link = "https://picjumbo.com/wp-content/uploads/entrepreneur-working-in-the-office-2210x1473.jpg"
-    await message.answer_photo(photo=photo_link,caption=about)
-
-@dp.message(F.text=="☎️ Contact admin")
-async def about_as_handler(message:Message):
-    about = "Admin info: \nTel: +998 (97)8710140 \nAdmin: @asilbe_admin" 
-    await message.answer(text= about)
-
-@dp.message(F.text == "📍 Location")
-async def company_location(message:Message):
-    lat = 40.102296
-    long = 65.37345
-    await message.answer("📍 Asilebk company location ")
-    await message.reply_location(latitude=lat,longitude=long)
-
-
-@dp.message(F.text=="💻 Computers")
-async def my_computers(message:Message):
-    await message.answer("Our computers",reply_markup=computer_button)
-
-@dp.message(F.text.func(lambda computer:computer in computers))
-async def computer_info(message:Message):
-    info = computers_info.get(message.text)
-
-    photo = info.get("photo")
-    price = info.get("price")
-    color = info.get("color")
-
-    text = f"{message.text}\nprice: {price}$ \ncolor:{color} and ..."
-
-    await message.answer_photo(photo=photo,caption=text)
-
-
-@dp.message(F.text=="📱 Phones")
-async def my_computers(message:Message):
-    await message.answer("Our computers",reply_markup=phone_button)
-
-@dp.message(F.text.func(lambda phone:phone in phones))
-async def computer_info(message:Message):
-    info = phones_info.get(message.text)
-
-    photo = info.get("photo")
-    price = info.get("price")
-    color = info.get("color")
-
-    text = f"{message.text}\nprice: {price}$\ncolor:{color} and ..."
-
-    await message.answer_photo(photo=photo,caption=text)
-
-
-@dp.message(F.text=="🔙 ortga")
-async def computer_func(message:Message):
-    text = "Asosiy menu"
-    await message.answer(text=text, reply_markup=main_button)
-
-
-@dp.message(CommandStart())
-async def start_command(message:Message):
-    full_name = message.from_user.full_name
-    telegram_id = message.from_user.id
-    try:
-        db.add_user(full_name=full_name,telegram_id=telegram_id) #foydalanuvchi bazaga qo'shildi
-        await message.answer(text="Assalomu alaykum, botimizga hush kelibsiz")
-    except:
-        await message.answer(text="Assalomu alaykum")
-
-
-
-
-# @dp.message(IsCheckSubChannels())
-# async def kanalga_obuna(message:Message):
-#     text = ""
-#     inline_channel = InlineKeyboardBuilder()
-#     for index,channel in enumerate(CHANNELS):
-#         ChatInviteLink = await bot.create_chat_invite_link(channel)
-#         inline_channel.add(InlineKeyboardButton(text=f"{index+1}-kanal",url=ChatInviteLink.invite_link))
-#     inline_channel.adjust(1,repeat=True)
-#     button = inline_channel.as_markup()
-#     await message.answer(f"{text} kanallarga azo bo'ling",reply_markup=button)
-
-
-
+    
 #help commands
 @dp.message(Command("help"))
 async def help_commands(message:Message):
